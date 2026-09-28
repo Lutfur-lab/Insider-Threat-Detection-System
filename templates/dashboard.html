@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block heading %}Dashboard{% endblock %}
+{% block crumb %}Overview of detected insider-threat activity{% endblock %}
+{% block topright %}<span class="pill">{{ total_users }} users monitored</span>{% endblock %}
+{% block content %}
+
+<div class="cards">
+  <div class="stat total"><div class="k">Total alerts</div><div class="v">{{ counts.Total }}</div><div class="sub">across all users</div></div>
+  <div class="stat high"><div class="k">High risk</div><div class="v">{{ counts.High }}</div><div class="sub">needs review now</div></div>
+  <div class="stat med"><div class="k">Medium risk</div><div class="v">{{ counts.Medium }}</div><div class="sub">worth investigating</div></div>
+  <div class="stat low"><div class="k">Low risk</div><div class="v">{{ counts.Low }}</div><div class="sub">logged for context</div></div>
+</div>
+
+<div style="display:grid;grid-template-columns:1.6fr 1fr;gap:20px;align-items:start;">
+  <div class="panel">
+    <div class="head"><h2>Recent high-priority alerts</h2>
+      <a class="meta" href="{{ url_for('alerts_page') }}" style="text-decoration:none;color:var(--brand);">View all →</a></div>
+    <table>
+      <thead><tr><th>User</th><th>Time</th><th>Type</th><th>Score</th><th>Risk</th></tr></thead>
+      <tbody>
+        {% for a in alerts %}
+        <tr class="sev-row {{ a.risk_level }}">
+          <td class="mono">{{ a.username }}</td>
+          <td class="mono" style="color:var(--ink-2);">{{ a.timestamp.replace('T',' ') }}</td>
+          <td>{% for t in a.anomaly_type.split(',') %}<span class="chip">{{ t }}</span>{% endfor %}</td>
+          <td class="score">{{ a.risk_score }}</td>
+          <td><span class="badge {{ a.risk_level }}">{{ a.risk_level }}</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:34px;">No alerts yet. Upload a log file to begin analysis.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <div class="head"><h2>Detections by type</h2></div>
+    <div style="padding:18px 19px;">
+      {% set labels = {'time':'Time anomaly','count':'Failed-login burst','pattern':'Suspicious pattern','privilege':'Privilege misuse'} %}
+      {% set maxv = type_counts.values()|max if type_counts else 1 %}
+      {% for key in ['time','count','pattern','privilege'] %}
+      <div style="margin-bottom:15px;">
+        <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:5px;">
+          <span style="color:var(--ink-2);">{{ labels[key] }}</span>
+          <span class="mono" style="font-weight:600;">{{ type_counts.get(key,0) }}</span>
+        </div>
+        <div style="height:7px;background:var(--panel-2);border-radius:4px;overflow:hidden;">
+          <div style="height:100%;width:{{ (type_counts.get(key,0)/maxv*100) if maxv else 0 }}%;background:var(--brand-2);border-radius:4px;"></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="panel" style="margin-top:20px;">
+  <div class="head"><h2>Activity timeline</h2><span class="meta">alerts by hour of day (00–23)</span></div>
+  <div style="padding:18px 19px 10px;">
+    {% set maxv = timeline.values()|max %}
+    <div style="display:flex;align-items:end;gap:4px;height:130px;">
+      {% for h in range(24) %}
+      <div style="flex:1;background:{{ 'var(--brand-2)' if timeline[h] else 'var(--line)' }};
+                  border-radius:3px 3px 0 0;min-height:3px;
+                  height:{{ (timeline[h]/maxv*100) if maxv else 0 }}%;"
+           title="{{ '%02d:00'|format(h) }} — {{ timeline[h] }} alert(s)"></div>
+      {% endfor %}
+    </div>
+    <div style="display:flex;gap:4px;margin-top:6px;">
+      {% for h in range(24) %}<span style="flex:1;text-align:center;font-size:10px;color:var(--ink-3);" class="mono">{{ '%02d'|format(h) }}</span>{% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

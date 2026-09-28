@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Users{% endblock %}
+{% block heading %}Users{% endblock %}
+{% block crumb %}Per-user behavioural baselines learned from historical activity{% endblock %}
+{% block topright %}<span class="pill">{{ baselines|length }} profiles</span>{% endblock %}
+{% block content %}
+
+<div class="panel">
+  <div class="head"><h2>Behavioural baselines</h2><span class="meta">the "normal" each user is scored against</span></div>
+  <table>
+    <thead><tr><th>User</th><th>Active hours</th><th>Known IPs</th><th>Avg logins/day</th><th>Privileges</th><th>Logs</th><th>Alerts</th></tr></thead>
+    <tbody>
+      {% for b in baselines %}
+      <tr>
+        <td class="mono" style="font-weight:600;">{{ b.username }}</td>
+        <td class="mono">{% if b.active_hours %}{{ '%02d:00'|format(b.active_hours[0]) }}–{{ '%02d:00'|format(b.active_hours[1]) }}{% else %}—{% endif %}</td>
+        <td>{% for ip in b.common_ips %}<span class="chip">{{ ip }}</span>{% endfor %}</td>
+        <td class="mono">{{ b.avg_login_frequency }}</td>
+        <td>{% for p in b.known_privileges %}<span class="chip">{{ p }}</span>{% endfor %}</td>
+        <td class="mono" style="color:var(--ink-2);">{{ b.log_count }}</td>
+        <td>{% if b.alert_count %}<span class="badge High">{{ b.alert_count }}</span>{% else %}<span class="mono" style="color:var(--ink-3);">0</span>{% endif %}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" style="text-align:center;color:var(--ink-3);padding:34px;">No baselines yet. Upload a log file to build user profiles.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p style="color:var(--ink-3);font-size:12.5px;margin-top:14px;line-height:1.6;">
+  Each baseline is built from a user's historical logins (FR-03). Active hours use a
+  5th–95th percentile band so occasional outliers don't widen what counts as normal.
+  The risk engine flags any later activity that falls outside these learned patterns.</p>
+{% endblock %}

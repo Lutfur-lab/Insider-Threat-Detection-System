@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Alerts{% endblock %}
+{% block heading %}Alerts{% endblock %}
+{% block crumb %}All flagged events — click a row for the full explanation{% endblock %}
+{% block topright %}<span class="pill">{{ alerts|length }} shown</span>{% endblock %}
+{% block content %}
+
+<div class="panel" style="margin-bottom:20px;">
+  <form method="get" action="{{ url_for('alerts_page') }}"
+        style="display:flex;flex-wrap:wrap;gap:14px;align-items:end;padding:16px 19px;">
+    <div style="display:flex;flex-direction:column;gap:5px;">
+      <label style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-3);font-weight:600;">User</label>
+      <select name="user"><option value="">All users</option>
+        {% for u in usernames %}<option value="{{ u }}" {{ 'selected' if filters.user==u }}>{{ u }}</option>{% endfor %}
+      </select>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:5px;">
+      <label style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-3);font-weight:600;">Risk level</label>
+      <select name="risk_level"><option value="">All levels</option>
+        {% for l in ['High','Medium','Low'] %}<option value="{{ l }}" {{ 'selected' if filters.risk_level==l }}>{{ l }}</option>{% endfor %}
+      </select>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:5px;">
+      <label style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-3);font-weight:600;">From</label>
+      <input type="date" name="date_from" value="{{ filters.date_from or '' }}">
+    </div>
+    <div style="display:flex;flex-direction:column;gap:5px;">
+      <label style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-3);font-weight:600;">To</label>
+      <input type="date" name="date_to" value="{{ filters.date_to or '' }}">
+    </div>
+    <button class="btn" type="submit">Apply filters</button>
+    <a class="btn ghost" href="{{ url_for('alerts_page') }}">Reset</a>
+  </form>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start;">
+  <div class="panel">
+    <div class="head"><h2>Flagged events</h2></div>
+    <table>
+      <thead><tr><th>User</th><th>Timestamp</th><th>Type</th><th>Source IP</th><th>Score</th><th>Risk</th></tr></thead>
+      <tbody>
+        {% for a in alerts %}
+        <tr class="sev-row {{ a.risk_level }}" data-alert='{{ a|tojson }}' style="cursor:pointer;">
+          <td class="mono">{{ a.username }}</td>
+          <td class="mono" style="color:var(--ink-2);">{{ a.timestamp.replace('T',' ') }}</td>
+          <td>{% for t in a.anomaly_type.split(',') %}<span class="chip">{{ t }}</span>{% endfor %}</td>
+          <td class="mono">{{ a.source_ip }}</td>
+          <td class="score">{{ a.risk_score }}</td>
+          <td><span class="badge {{ a.risk_level }}">{{ a.risk_level }}</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" style="text-align:center;color:var(--ink-3);padding:34px;">No alerts match these filters.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panel" style="position:sticky;top:80px;">
+    <div class="head"><h2>Alert detail</h2></div>
+    <div id="detail" style="padding:19px;">
+      <p style="color:var(--ink-3);text-align:center;padding:30px 8px;font-size:13px;">
+        Select an alert to see the indicators that drove its risk score.</p>
+    </div>
+  </div>
+</div>
+
+{% block scripts %}
+<script>
+  // Security: escape all database-sourced values before inserting into HTML.
+  // Defence-in-depth alongside the parser's input validation (log_parser.py).
+  function esc(s) {
+    const el = document.createElement('span');
+    el.textContent = String(s);
+    return el.innerHTML;
+  }
+
+  const rows = document.querySelectorAll('tr[data-alert]');
+  const detail = document.getElementById('detail');
+  const col = {High:'var(--high)',Medium:'var(--med)',Low:'var(--low)'};
+  rows.forEach(r => r.addEventListener('click', () => {
+    rows.forEach(x => x.style.background='');
+    r.style.background='var(--panel-2)';
+    const a = JSON.parse(r.dataset.alert);
+    const inds = a.explanation.split(' | ').map(t =>
+      `<div style="background:var(--panel-2);border-left:3px solid ${col[a.risk_level]};
+        padding:9px 12px;border-radius:0 7px 7px 0;margin-bottom:8px;font-size:12.5px;line-height:1.5;">${esc(t)}</div>`).join('');
+    detail.innerHTML = `
+      <div style="font-family:var(--mono);font-size:15px;font-weight:600;">${esc(a.username)}</div>
+      <div style="font-family:var(--mono);font-size:12px;color:var(--ink-3);margin-bottom:15px;">${esc(a.timestamp.replace('T',' '))}</div>
+      ${[['Source IP',a.source_ip],['Auth outcome',a.auth_outcome],['Privilege',a.privilege_level],['Types',a.anomaly_type]].map(([k,v])=>
+        `<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line-2);font-size:13px;">
+          <span style="color:var(--ink-3);">${esc(k)}</span><span class="mono">${esc(v)}</span></div>`).join('')}
+      <div style="height:8px;background:var(--panel-2);border-radius:4px;overflow:hidden;margin:14px 0 5px;">
+        <div style="height:100%;width:${Math.min(a.risk_score,100)}%;background:${col[a.risk_level]};"></div></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <span style="color:var(--ink-3);font-size:13px;">Risk score</span>
+        <span><span class="badge ${esc(a.risk_level)}">${esc(a.risk_level)}</span> <span class="mono" style="font-weight:600;">${a.risk_score}/100</span></span></div>
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-3);font-weight:600;margin-bottom:9px;">Contributing indicators</div>
+      ${inds}`;
+  }));
+</script>
+{% endblock %}
+{% endblock %}
